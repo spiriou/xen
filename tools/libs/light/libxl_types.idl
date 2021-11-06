@@ -800,6 +800,7 @@ libxl_device_pci = Struct("device_pci", [
     ("msitranslate", bool),
     ("power_mgmt", bool),
     ("permissive", bool),
+    ("romfile", string),
     ("seize", bool),
     ("rdm_policy", libxl_rdm_reserve_policy),
     ("name", string),

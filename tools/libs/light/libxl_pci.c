@@ -1234,6 +1234,8 @@ static void pci_add_qmp_device_add(libxl__egc *egc, pci_add_state *pas)
      */
     if (pci->permissive)
         libxl__qmp_param_add_bool(gc, &args, "permissive", true);
+    if (pci->romfile)
+        libxl__qmp_param_add_string(gc, &args, "romfile", pci->romfile);
 
     qmp->ao = pas->aodev->ao;
     qmp->domid = domid;
@@ -2437,6 +2439,9 @@ static int libxl__device_pci_from_xs_be(libxl__gc *gc,
             } else if (!strcmp(p, "rdm_policy")) {
                 p = strtok_r(NULL, ",=", &saveptr);
                 libxl_rdm_reserve_policy_from_string(p, &pci->rdm_policy);
+            } else if (!strcmp(p, "romfile")) {
+                p = strtok_r(NULL, ",=", &saveptr);
+                pci->romfile = strdup(p);
             }
         } while ((p = strtok_r(NULL, ",=", &saveptr)) != NULL);
     }
