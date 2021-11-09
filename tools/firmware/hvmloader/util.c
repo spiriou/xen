@@ -782,6 +782,69 @@ int get_pc_machine_type(void)
     return machine_type;
 }
 
+#define PCIEXBAR_ADDR_MASK_64MB     (~((1ULL << 26) - 1))
+#define PCIEXBAR_ADDR_MASK_128MB    (~((1ULL << 27) - 1))
+#define PCIEXBAR_ADDR_MASK_256MB    (~((1ULL << 28) - 1))
+#define PCIEXBAR_LENGTH_BITS(reg)   (((reg) >> 1) & 3)
+#define PCIEXBAREN                  1
+
+static uint64_t mmconfig_get_base(void)
+{
+    uint64_t base;
+    uint32_t reg = pci_readl(PCI_MCH_DEVFN, PCI_MCH_PCIEXBAR);
+
+    base = reg | (uint64_t) pci_readl(PCI_MCH_DEVFN, PCI_MCH_PCIEXBAR+4) << 32;
+
+    switch (PCIEXBAR_LENGTH_BITS(reg))
+    {
+    case 0:
+        base &= PCIEXBAR_ADDR_MASK_256MB;
+        break;
+    case 1:
+        base &= PCIEXBAR_ADDR_MASK_128MB;
+        break;
+    case 2:
+        base &= PCIEXBAR_ADDR_MASK_64MB;
+        break;
+    case 3:
+        BUG();  /* a reserved value encountered */
+    }
+
+    return base;
+}
+
+static uint32_t mmconfig_get_size(void)
+{
+    uint32_t reg = pci_readl(PCI_MCH_DEVFN, PCI_MCH_PCIEXBAR);
+
+    switch (PCIEXBAR_LENGTH_BITS(reg))
+    {
+    case 0: return MB(256);
+    case 1: return MB(128);
+    case 2: return MB(64);
+    case 3:
+        BUG();  /* a reserved value encountered */
+    }
+
+    return 0;
+}
+
+static uint32_t mmconfig_is_enabled(void)
+{
+    return pci_readl(PCI_MCH_DEVFN, PCI_MCH_PCIEXBAR) & PCIEXBAREN;
+}
+
+static int is_mmconfig_used(void)
+{
+    if (get_pc_machine_type() == MACHINE_TYPE_Q35)
+    {
+        if (mmconfig_is_enabled() && mmconfig_get_base())
+            return 1;
+    }
+
+    return 0;
+}
+
 static void validate_hvm_info(struct hvm_info_table *t)
 {
     uint8_t *ptr = (uint8_t *)t;
@@ -1018,6 +1081,13 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     {
         config->pci_hi_start = pci_hi_mem_start;
         config->pci_hi_len = pci_hi_mem_end - pci_hi_mem_start;
+    }
+
+    if ( is_mmconfig_used() )
+    {
+        config->table_flags |= ACPI_HAS_MCFG;
+        config->mmconfig_addr = mmconfig_get_base();
+        config->mmconfig_len  = mmconfig_get_size();
     }
 
     s = xenstore_read("platform/generation-id", "0:0");
