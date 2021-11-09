@@ -1794,7 +1794,11 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_HVM:
 
         if (b_info->device_model_machine == LIBXL_DEVICE_MODEL_MACHINE_Q35) {
-            machinearg = libxl__sprintf(gc, "q35,accel=xen,suppress-vmdesc=on");
+            if (!libxl_defbool_val(b_info->u.hvm.xen_platform_pci)) {
+                machinearg = libxl__sprintf(gc, "q35,accel=xen,suppress-vmdesc=on");
+            } else {
+                machinearg = libxl__sprintf(gc, "q35,accel=xen,xen-platform-dev=on,suppress-vmdesc=on");
+            }
         } else {
             if (!libxl_defbool_val(b_info->u.hvm.xen_platform_pci)) {
                 /* Switching here to the machine "pc" which does not add
