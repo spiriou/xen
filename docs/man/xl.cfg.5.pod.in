@@ -2748,6 +2748,33 @@ you have existing guests then, depending on the nature of the guest
 Operating System, you may wish to force them to use the device
 model which they were installed with.
 
+=item B<device_model_machine="STRING">
+
+Selects which chipset the device model should emulate for this
+guest.
+
+Valid options are:
+
+=over 4
+
+=item B<"i440">
+
+Use i440 emulation (a default setting)
+
+=item B<"q35">
+
+Use Q35/ICH9 emulation. This enables additional features for
+PCIe device passthrough
+
+=back
+
+Note that omitting device_model_machine parameter means i440 system
+by default, so the default behavior doesn't change for old domain
+config files.
+
+It is recommended to install the guest OS from scratch to avoid issues
+due to the emulated platform change.
+
 =item B<device_model_override="PATH">
 
 Override the path to the binary to be used as the device-model running in
