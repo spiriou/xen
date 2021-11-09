@@ -259,9 +259,16 @@ static const struct bios_config *detect_bios(void)
 static void acpi_enable_sci(void)
 {
     uint8_t pm1a_cnt_val;
+    uint8_t acpi_enable_val;
 
-#define PIIX4_SMI_CMD_IOPORT 0xb2
+#define SMI_CMD_IOPORT       0xb2
 #define PIIX4_ACPI_ENABLE    0xf1
+#define ICH9_ACPI_ENABLE     0x02
+
+    if (get_pc_machine_type() == MACHINE_TYPE_Q35)
+        acpi_enable_val = ICH9_ACPI_ENABLE;
+    else
+        acpi_enable_val = PIIX4_ACPI_ENABLE;
 
     /*
      * PIIX4 emulation in QEMU has SCI_EN=0 by default. We have no legacy
@@ -269,7 +276,7 @@ static void acpi_enable_sci(void)
      */
     pm1a_cnt_val = inb(ACPI_PM1A_CNT_BLK_ADDRESS_V1);
     if ( !(pm1a_cnt_val & ACPI_PM1C_SCI_EN) )
-        outb(PIIX4_SMI_CMD_IOPORT, PIIX4_ACPI_ENABLE);
+        outb(SMI_CMD_IOPORT, acpi_enable_val);
 
     pm1a_cnt_val = inb(ACPI_PM1A_CNT_BLK_ADDRESS_V1);
     BUG_ON(!(pm1a_cnt_val & ACPI_PM1C_SCI_EN));
