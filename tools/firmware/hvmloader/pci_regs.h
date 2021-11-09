@@ -111,6 +111,7 @@
 #define PCI_DEVICE_ID_INTEL_82441        0x1237
 #define PCI_DEVICE_ID_INTEL_Q35_MCH      0x29c0
 
+#define PCI_MCH_PCIEXBAR                 0x60
 
 #endif /* __HVMLOADER_PCI_REGS_H__ */
 

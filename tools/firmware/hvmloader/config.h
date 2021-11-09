@@ -55,6 +55,13 @@ extern uint8_t ioapic_version;
 #define PCI_ISA_DEVFN       0x08    /* dev 1, fn 0 */
 #define PCI_ISA_IRQ_MASK    0x0c20U /* ISA IRQs 5,10,11 are PCI connected */
 #define PCI_ICH9_LPC_DEVFN  0xf8    /* dev 31, fn 0 */
+#define PCI_MCH_DEVFN       0       /* bus 0, dev 0, func 0 */
+
+/*
+ * Possible values are: 64, 128, 256.
+ * Note that ovmf/edk2 only supports 256.
+ */
+#define PCI_MAX_MCFG_BUSES  256
 
 #define ACPI_TIS_HDR_ADDRESS 0xFED40F00UL
 

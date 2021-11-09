@@ -157,9 +157,10 @@ static void class_specific_pci_device_setup(uint16_t vendor_id,
 
 void pci_setup(void)
 {
-    uint8_t is_64bar, using_64bar, bar64_relocate = 0;
+    uint8_t is_64bar, using_64bar, bar64_relocate = 0, is_mem;
     uint32_t devfn, bar_reg, cmd, bar_data, bar_data_upper;
     uint64_t base, bar_sz, bar_sz_upper, mmio_total = 0;
+    uint64_t addr_mask;
     uint16_t vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
     uint8_t pci_devfn_decode_type[256] = {};
@@ -172,10 +173,14 @@ void pci_setup(void)
 
     /* Create a list of device BARs in descending order of size. */
     struct bars {
-        uint32_t is_64bar;
         uint32_t devfn;
         uint32_t bar_reg;
         uint64_t bar_sz;
+        uint64_t addr_mask; /* which bits of the base address can be written */
+        uint32_t bar_data;  /* initial value - BAR flags here */
+        uint8_t  is_64bar;
+        uint8_t  is_mem;
+        uint8_t  padding[2];
     } *bars = (struct bars *)scratch_start;
     unsigned int i, nr_bars = 0;
     uint64_t mmio_hole_size = 0;
@@ -335,13 +340,20 @@ void pci_setup(void)
                 bar_reg = PCI_ROM_ADDRESS;
 
             bar_data = pci_readl(devfn, bar_reg);
+
+            is_mem = !!(((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                       PCI_BASE_ADDRESS_SPACE_MEMORY) ||
+                       (bar_reg == PCI_ROM_ADDRESS));
+
             if ( bar_reg != PCI_ROM_ADDRESS )
             {
-                is_64bar = !!((bar_data & (PCI_BASE_ADDRESS_SPACE |
-                             PCI_BASE_ADDRESS_MEM_TYPE_MASK)) ==
-                             (PCI_BASE_ADDRESS_SPACE_MEMORY |
+                is_64bar = !!(is_mem &&
+                             ((bar_data & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
                              PCI_BASE_ADDRESS_MEM_TYPE_64));
                 pci_writel(devfn, bar_reg, ~0);
+
+                addr_mask = is_mem ? PCI_BASE_ADDRESS_MEM_MASK
+                                   : PCI_BASE_ADDRESS_IO_MASK;
             }
             else
             {
@@ -349,18 +361,20 @@ void pci_setup(void)
                 pci_writel(devfn, bar_reg,
                            (bar_data | PCI_ROM_ADDRESS_MASK) &
                            ~PCI_ROM_ADDRESS_ENABLE);
+
+                addr_mask = PCI_ROM_ADDRESS_MASK;
             }
             bar_sz = pci_readl(devfn, bar_reg);
             pci_writel(devfn, bar_reg, bar_data);
 
             if ( bar_reg != PCI_ROM_ADDRESS )
-                bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                            PCI_BASE_ADDRESS_SPACE_MEMORY) ?
-                           PCI_BASE_ADDRESS_MEM_MASK :
-                           (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
+                bar_sz &= is_mem ? PCI_BASE_ADDRESS_MEM_MASK :
+                                   (PCI_BASE_ADDRESS_IO_MASK & 0xffff);
             else
                 bar_sz &= PCI_ROM_ADDRESS_MASK;
-            if (is_64bar) {
+
+            if (is_64bar)
+            {
                 bar_data_upper = pci_readl(devfn, bar_reg + 4);
                 pci_writel(devfn, bar_reg + 4, ~0);
                 bar_sz_upper = pci_readl(devfn, bar_reg + 4);
@@ -371,6 +385,9 @@ void pci_setup(void)
             if ( bar_sz == 0 )
                 continue;
 
+            /* leave only memtype/enable bits etc */
+            bar_data &= ~addr_mask;
+
             for ( i = 0; i < nr_bars; i++ )
                 if ( bars[i].bar_sz < bar_sz )
                     break;
@@ -378,14 +395,15 @@ void pci_setup(void)
             if ( i != nr_bars )
                 memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
 
-            bars[i].is_64bar = is_64bar;
-            bars[i].devfn   = devfn;
-            bars[i].bar_reg = bar_reg;
-            bars[i].bar_sz  = bar_sz;
+            bars[i].is_64bar  = is_64bar;
+            bars[i].is_mem    = is_mem;
+            bars[i].devfn     = devfn;
+            bars[i].bar_reg   = bar_reg;
+            bars[i].bar_sz    = bar_sz;
+            bars[i].addr_mask = addr_mask;
+            bars[i].bar_data  = bar_data;
 
-            if ( ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                  PCI_BASE_ADDRESS_SPACE_MEMORY) ||
-                 (bar_reg == PCI_ROM_ADDRESS) )
+            if ( is_mem )
                 mmio_total += bar_sz;
 
             nr_bars++;
@@ -411,6 +429,63 @@ void pci_setup(void)
 
         /* Enable bus master for this function later */
         pci_devfn_decode_type[devfn] = PCI_COMMAND_MASTER;
+    }
+
+    /*
+     *  Calculate MMCONFIG area size and squeeze it into the bars array
+     *  for assigning a slot in the MMIO hole
+     */
+    if (is_running_on_q35)
+    {
+        /* disable PCIEXBAR decoding for now */
+        pci_writel(PCI_MCH_DEVFN, PCI_MCH_PCIEXBAR, 0);
+        pci_writel(PCI_MCH_DEVFN, PCI_MCH_PCIEXBAR + 4, 0);
+
+#define PCIEXBAR_64_BUSES    (2 << 1)
+#define PCIEXBAR_128_BUSES   (1 << 1)
+#define PCIEXBAR_256_BUSES   (0 << 1)
+#define PCIEXBAR_ENABLE      (1 << 0)
+
+        switch (PCI_MAX_MCFG_BUSES)
+        {
+        case 64:
+            bar_data = PCIEXBAR_64_BUSES | PCIEXBAR_ENABLE;
+            bar_sz = MB(64);
+            break;
+
+        case 128:
+            bar_data = PCIEXBAR_128_BUSES | PCIEXBAR_ENABLE;
+            bar_sz = MB(128);
+            break;
+
+        case 256:
+            bar_data = PCIEXBAR_256_BUSES | PCIEXBAR_ENABLE;
+            bar_sz = MB(256);
+            break;
+
+        default:
+            /* unsupported number of buses specified */
+            BUG();
+        }
+
+        addr_mask = ~(bar_sz - 1);
+
+        for ( i = 0; i < nr_bars; i++ )
+            if ( bars[i].bar_sz < bar_sz )
+                break;
+
+        if ( i != nr_bars )
+            memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
+
+        bars[i].is_mem    = 1;
+        bars[i].devfn     = PCI_MCH_DEVFN;
+        bars[i].bar_reg   = PCI_MCH_PCIEXBAR;
+        bars[i].bar_sz    = bar_sz;
+        bars[i].addr_mask = addr_mask;
+        bars[i].bar_data  = bar_data;
+
+        mmio_total += bar_sz;
+        nr_bars++;
     }
 
     if ( mmio_hole_size )
@@ -547,31 +622,28 @@ void pci_setup(void)
          */
         using_64bar = bars[i].is_64bar && bar64_relocate
             && (mmio_total > (mem_resource.max - mem_resource.base));
-        bar_data = pci_readl(devfn, bar_reg);
 
-        if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
-             PCI_BASE_ADDRESS_SPACE_MEMORY )
+        bar_data = bars[i].bar_data;
+
+        if ( bars[i].is_mem )
         {
             /* Mapping high memory if PCI device is 64 bits bar */
             if ( using_64bar ) {
                 if ( high_mem_resource.base & (bar_sz - 1) )
-                    high_mem_resource.base = high_mem_resource.base - 
+                    high_mem_resource.base = high_mem_resource.base -
                         (high_mem_resource.base & (bar_sz - 1)) + bar_sz;
                 if ( !pci_hi_mem_start )
                     pci_hi_mem_start = high_mem_resource.base;
                 resource = &high_mem_resource;
-                bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
-            } 
+            }
             else {
                 resource = &mem_resource;
-                bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
             }
             mmio_total -= bar_sz;
         }
         else
         {
             resource = &io_resource;
-            bar_data &= ~PCI_BASE_ADDRESS_IO_MASK;
         }
 
         base = (resource->base  + bar_sz - 1) & ~(uint64_t)(bar_sz - 1);
@@ -593,7 +665,7 @@ void pci_setup(void)
             }
         }
 
-        bar_data |= (uint32_t)base;
+        bar_data |= (uint32_t) (base & bars[i].addr_mask);
         bar_data_upper = (uint32_t)(base >> 32);
         base += bar_sz;
 
@@ -615,9 +687,7 @@ void pci_setup(void)
                PRIllx_arg(bar_sz),
                bar_data_upper, bar_data);
 			
-        if ( (bar_reg == PCI_ROM_ADDRESS) ||
-             ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-              PCI_BASE_ADDRESS_SPACE_MEMORY) )
+        if ( bars[i].is_mem )
             pci_devfn_decode_type[devfn] |= PCI_COMMAND_MEMORY;
         else
             pci_devfn_decode_type[devfn] |= PCI_COMMAND_IO;
