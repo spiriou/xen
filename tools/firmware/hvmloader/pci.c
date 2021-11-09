@@ -34,6 +34,7 @@ const uint32_t pci_mem_end = RESERVED_MEMBASE;
 uint64_t pci_hi_mem_start = 0, pci_hi_mem_end = 0;
 
 enum virtual_vga virtual_vga = VGA_none;
+uint32_t vga_devfn = 256;
 unsigned long igd_opregion_pgbase = 0;
 
 /* Check if the specified range conflicts with any reserved device memory. */
@@ -75,15 +76,94 @@ static int find_next_rmrr(uint32_t base)
     return next_rmrr;
 }
 
+#define SCI_EN_IOPORT  (ACPI_PM1A_EVT_BLK_ADDRESS_V1 + 0x30)
+#define GBL_SMI_EN      (1 << 0)
+#define APMC_EN         (1 << 5)
+
+static void class_specific_pci_device_setup(uint16_t vendor_id,
+                                            uint16_t device_id,
+                                            uint8_t bus, uint8_t devfn)
+{
+    uint16_t class;
+
+    class = pci_readw(devfn, PCI_CLASS_DEVICE);
+
+    switch ( class )
+    {
+    case 0x0300:
+        /* If emulated VGA is found, preserve it as primary VGA. */
+        if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
+        {
+            vga_devfn = devfn;
+            virtual_vga = VGA_std;
+        }
+        else if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
+        {
+            vga_devfn = devfn;
+            virtual_vga = VGA_cirrus;
+        }
+        else if ( virtual_vga == VGA_none )
+        {
+            vga_devfn = devfn;
+            virtual_vga = VGA_pt;
+            if ( vendor_id == 0x8086 )
+            {
+                igd_opregion_pgbase = mem_hole_alloc(IGD_OPREGION_PAGES);
+                /*
+                 * Write the the OpRegion offset to give the opregion
+                 * address to the device model. The device model will trap
+                 * and map the OpRegion at the give address.
+                 */
+                pci_writel(vga_devfn, PCI_INTEL_OPREGION,
+                           igd_opregion_pgbase << PAGE_SHIFT);
+            }
+        }
+        break;
+
+    case 0x0680:
+        /* PIIX4 ACPI PM. Special device with special PCI config space. */
+        ASSERT((vendor_id == 0x8086) && (device_id == 0x7113));
+        pci_writew(devfn, 0x20, 0x0000); /* No smb bus IO enable */
+        pci_writew(devfn, 0xd2, 0x0000); /* No smb bus IO enable */
+        pci_writew(devfn, 0x22, 0x0000);
+        pci_writew(devfn, 0x3c, 0x0009); /* Hardcoded IRQ9 */
+        pci_writew(devfn, 0x3d, 0x0001);
+        pci_writel(devfn, 0x40, ACPI_PM1A_EVT_BLK_ADDRESS_V1 | 1);
+        pci_writeb(devfn, 0x80, 0x01); /* enable PM io space */
+        break;
+
+    case 0x0601:
+        /* LPC bridge */
+        if (vendor_id == 0x8086 && device_id == 0x2918)
+        {
+            pci_writeb(devfn, 0x3c, 0x09); /* Hardcoded IRQ9 */
+            pci_writeb(devfn, 0x3d, 0x01);
+            pci_writel(devfn, 0x40, ACPI_PM1A_EVT_BLK_ADDRESS_V1 | 1);
+            pci_writeb(devfn, 0x44, 0x80); /* enable PM io space */
+            outl(SCI_EN_IOPORT, inl(SCI_EN_IOPORT) | GBL_SMI_EN | APMC_EN);
+        }
+        break;
+
+    case 0x0101:
+        if ( vendor_id == 0x8086 )
+        {
+            /* Intel ICHs since PIIX3: enable IDE legacy mode. */
+            pci_writew(devfn, 0x40, 0x8000); /* enable IDE0 */
+            pci_writew(devfn, 0x42, 0x8000); /* enable IDE1 */
+        }
+        break;
+    }
+}
+
 void pci_setup(void)
 {
     uint8_t is_64bar, using_64bar, bar64_relocate = 0;
     uint32_t devfn, bar_reg, cmd, bar_data, bar_data_upper;
     uint64_t base, bar_sz, bar_sz_upper, mmio_total = 0;
-    uint32_t vga_devfn = 256;
-    uint16_t class, vendor_id, device_id;
+    uint16_t vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
     uint8_t pci_devfn_decode_type[256] = {};
+    int is_running_on_q35 = 0;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
@@ -137,13 +217,28 @@ void pci_setup(void)
     if ( s )
         mmio_hole_size = strtoll(s, NULL, 0);
 
+    /* check if we are on Q35 and set the flag if it is the case */
+    is_running_on_q35 = get_pc_machine_type() == MACHINE_TYPE_Q35;
+
     /* Program PCI-ISA bridge with appropriate link routes. */
     isa_irq = 0;
     for ( link = 0; link < 4; link++ )
     {
         do { isa_irq = (isa_irq + 1) & 15;
         } while ( !(PCI_ISA_IRQ_MASK & (1U << isa_irq)) );
-        pci_writeb(PCI_ISA_DEVFN, 0x60 + link, isa_irq);
+
+        if (is_running_on_q35)
+        {
+            pci_writeb(PCI_ICH9_LPC_DEVFN, 0x60 + link, isa_irq);
+
+            /* PIRQE..PIRQH are unused */
+            pci_writeb(PCI_ICH9_LPC_DEVFN, 0x68 + link, 0x80);
+        }
+        else
+        {
+            pci_writeb(PCI_ISA_DEVFN, 0x60 + link, isa_irq);
+        }
+
         printf("PCI-ISA link %u routed to IRQ%u\n", link, isa_irq);
     }
 
@@ -154,7 +249,6 @@ void pci_setup(void)
     /* Scan the PCI bus and map resources. */
     for ( devfn = 0; devfn < 256; devfn++ )
     {
-        class     = pci_readw(devfn, PCI_CLASS_DEVICE);
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
         device_id = pci_readw(devfn, PCI_DEVICE_ID);
         if ( (vendor_id == 0xffff) && (device_id == 0xffff) )
@@ -214,6 +308,9 @@ void pci_setup(void)
             }
             break;
         }
+
+        class_specific_pci_device_setup(vendor_id, device_id,
+                                        0 /* virt_bus support TBD */, devfn);
 
         /*
          * It is recommended that BAR programming be done whilst decode
@@ -304,7 +401,9 @@ void pci_setup(void)
         {
             /* This is the barber's pole mapping used by Xen. */
             link = ((pin - 1) + (devfn >> 3)) & 3;
-            isa_irq = pci_readb(PCI_ISA_DEVFN, 0x60 + link);
+            isa_irq = pci_readb(is_running_on_q35 ?
+                                PCI_ICH9_LPC_DEVFN : PCI_ISA_DEVFN,
+                                0x60 + link);
             pci_writeb(devfn, PCI_INTERRUPT_LINE, isa_irq);
             printf("pci dev %02x:%x INT%c->IRQ%u\n",
                    devfn>>3, devfn&7, 'A'+pin-1, isa_irq);
