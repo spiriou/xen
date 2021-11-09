@@ -22,6 +22,7 @@
 #include "hypercall.h"
 #include "ctype.h"
 #include "vnuma.h"
+#include "pci_regs.h"
 #include <acpi2_0.h>
 #include <libacpi.h>
 #include <stdint.h>
@@ -733,6 +734,52 @@ void __bug(const char *file, int line)
 {
     printf("*** HVMLoader bug at %s:%d\n", file, line);
     crash();
+}
+
+
+static int machine_type = MACHINE_TYPE_UNDEFINED;
+
+int get_pc_machine_type(void)
+{
+    uint16_t vendor_id;
+    uint16_t device_id;
+
+    if (machine_type != MACHINE_TYPE_UNDEFINED)
+        return machine_type;
+
+    machine_type = MACHINE_TYPE_UNKNOWN;
+
+    vendor_id = pci_readw(0, PCI_VENDOR_ID);
+    device_id = pci_readw(0, PCI_DEVICE_ID);
+
+    /* only Intel platforms are emulated currently */
+    if (vendor_id == PCI_VENDOR_ID_INTEL)
+    {
+        switch (device_id)
+        {
+        case PCI_DEVICE_ID_INTEL_82441:
+            machine_type = MACHINE_TYPE_I440;
+            printf("Detected i440 chipset\n");
+            break;
+
+        case PCI_DEVICE_ID_INTEL_Q35_MCH:
+            machine_type = MACHINE_TYPE_Q35;
+            printf("Detected Q35 chipset\n");
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    if (machine_type == MACHINE_TYPE_UNKNOWN)
+    {
+        printf("Unknown emulated chipset encountered, VID=%04Xh, DID=%04Xh\n",
+               vendor_id, device_id);
+        BUG();
+    }
+
+    return machine_type;
 }
 
 static void validate_hvm_info(struct hvm_info_table *t)

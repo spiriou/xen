@@ -107,6 +107,11 @@
 
 #define PCI_INTEL_OPREGION 0xfc /* 4 bits */
 
+#define PCI_VENDOR_ID_INTEL              0x8086
+#define PCI_DEVICE_ID_INTEL_82441        0x1237
+#define PCI_DEVICE_ID_INTEL_Q35_MCH      0x29c0
+
+
 #endif /* __HVMLOADER_PCI_REGS_H__ */
 
 /*
