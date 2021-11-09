@@ -982,8 +982,17 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     }
     else if ( !strncmp(s, "qemu_xen", 9) )
     {
-        config->dsdt_anycpu = dsdt_anycpu_qemu_xen;
-        config->dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len;
+        if (get_pc_machine_type() == MACHINE_TYPE_Q35)
+        {
+            config->dsdt_anycpu = dsdt_q35_anycpu_qemu_xen;
+            config->dsdt_anycpu_len = dsdt_q35_anycpu_qemu_xen_len;
+        }
+        else
+        {
+            config->dsdt_anycpu = dsdt_anycpu_qemu_xen;
+            config->dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len;
+        }
+
         config->dsdt_15cpu = NULL;
         config->dsdt_15cpu_len = 0;
     }

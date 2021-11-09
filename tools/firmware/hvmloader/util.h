@@ -288,7 +288,9 @@ bool check_overlap(uint64_t start, uint64_t size,
                    uint64_t reserved_start, uint64_t reserved_size);
 
 extern const unsigned char dsdt_anycpu_qemu_xen[], dsdt_anycpu[], dsdt_15cpu[];
+extern const unsigned char dsdt_q35_anycpu_qemu_xen[];
 extern const int dsdt_anycpu_qemu_xen_len, dsdt_anycpu_len, dsdt_15cpu_len;
+extern const int dsdt_q35_anycpu_qemu_xen_len;
 
 unsigned long acpi_pages_allocated(void);
 
