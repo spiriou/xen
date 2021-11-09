@@ -1792,13 +1792,18 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, b_info->extra_pv[i]);
         break;
     case LIBXL_DOMAIN_TYPE_HVM:
-        if (!libxl_defbool_val(b_info->u.hvm.xen_platform_pci)) {
-            /* Switching here to the machine "pc" which does not add
-             * the xen-platform device instead of the default "xenfv" machine.
-             */
-            machinearg = libxl__strdup(gc, "pc,accel=xen,suppress-vmdesc=on");
+
+        if (b_info->device_model_machine == LIBXL_DEVICE_MODEL_MACHINE_Q35) {
+            machinearg = libxl__sprintf(gc, "q35,accel=xen,suppress-vmdesc=on");
         } else {
-            machinearg = libxl__strdup(gc, "xenfv,suppress-vmdesc=on");
+            if (!libxl_defbool_val(b_info->u.hvm.xen_platform_pci)) {
+                /* Switching here to the machine "pc" which does not add
+                 * the xen-platform device instead of the default "xenfv" machine.
+                 */
+                machinearg = libxl__strdup(gc, "pc,accel=xen,suppress-vmdesc=on");
+            } else {
+                machinearg = libxl__strdup(gc, "xenfv,suppress-vmdesc=on");
+            }
         }
         if (b_info->u.hvm.mmio_hole_memkb) {
             uint64_t max_ram_below_4g = (1ULL << 32) -

@@ -108,6 +108,12 @@ libxl_device_model_version = Enumeration("device_model_version", [
     (2, "QEMU_XEN"),             # Upstream based qemu-xen device model
     ])
 
+libxl_device_model_machine = Enumeration("device_model_machine", [
+    (0, "UNKNOWN"),
+    (1, "I440"),
+    (2, "Q35"),
+    ])
+
 libxl_console_type = Enumeration("console_type", [
     (0, "UNKNOWN"),
     (1, "SERIAL"),
@@ -532,6 +538,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("device_model_ssidref", uint32),
     ("device_model_ssid_label", string),
     ("device_model_user", string),
+    ("device_model_machine", libxl_device_model_machine),
 
     # extra parameters pass directly to qemu, NULL terminated
     ("extra",            libxl_string_list),

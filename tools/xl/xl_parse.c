@@ -2549,6 +2549,20 @@ skip_usbdev:
     if (!xlu_cfg_get_long (config, "stubdomain_memory", &l, 0))
         b_info->stubdomain_memkb = l * 1024;
 
+    if (!xlu_cfg_get_string (config, "device_model_machine", &buf, 0)) {
+        if (!strcmp(buf, "i440")) {
+            b_info->device_model_machine = LIBXL_DEVICE_MODEL_MACHINE_I440;
+        } else if (!strcmp(buf, "q35")) {
+            b_info->device_model_machine = LIBXL_DEVICE_MODEL_MACHINE_Q35;
+        } else {
+            fprintf(stderr,
+                    "Unknown device_model_machine \"%s\" specified\n", buf);
+            exit(1);
+        }
+    } else {
+        b_info->device_model_machine = LIBXL_DEVICE_MODEL_MACHINE_UNKNOWN;
+    }
+
 #define parse_extra_args(type)                                            \
     e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
                                     &b_info->extra##type, 0);            \
