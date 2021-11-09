@@ -422,6 +422,25 @@ struct acpi_20_slit {
 };
 
 /*
+ * PCI Express Memory Mapped Configuration Description Table
+ */
+struct mcfg_range_entry {
+    uint64_t base_address;
+    uint16_t pci_segment;
+    uint8_t  start_pci_bus_num;
+    uint8_t  end_pci_bus_num;
+    uint32_t reserved;
+};
+
+struct acpi_mcfg {
+    struct acpi_header header;
+    uint8_t reserved[8];
+    struct mcfg_range_entry entries[1];
+};
+
+#define MCFG_SIZE_TO_NUM_BUSES(size)  ((size) >> 20)
+
+/*
  * Table Signatures.
  */
 #define ACPI_2_0_RSDP_SIGNATURE ASCII64('R','S','D',' ','P','T','R',' ')
@@ -435,6 +454,7 @@ struct acpi_20_slit {
 #define ACPI_2_0_WAET_SIGNATURE ASCII32('W','A','E','T')
 #define ACPI_2_0_SRAT_SIGNATURE ASCII32('S','R','A','T')
 #define ACPI_2_0_SLIT_SIGNATURE ASCII32('S','L','I','T')
+#define ACPI_MCFG_SIGNATURE     ASCII32('M','C','F','G')
 
 /*
  * Table revision numbers.
@@ -449,6 +469,7 @@ struct acpi_20_slit {
 #define ACPI_1_0_FADT_REVISION 0x01
 #define ACPI_2_0_SRAT_REVISION 0x01
 #define ACPI_2_0_SLIT_REVISION 0x01
+#define ACPI_1_0_MCFG_REVISION 0x01
 
 #pragma pack ()
 

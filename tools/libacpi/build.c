@@ -303,6 +303,37 @@ static struct acpi_20_slit *construct_slit(struct acpi_ctxt *ctxt,
     return slit;
 }
 
+static struct acpi_mcfg *construct_mcfg(struct acpi_ctxt *ctxt,
+                                        const struct acpi_config *config)
+{
+    struct acpi_mcfg *mcfg;
+
+    /* Warning: this code expects that we have only one PCI segment */
+    mcfg = ctxt->mem_ops.alloc(ctxt, sizeof(*mcfg), 16);
+    if (!mcfg)
+        return NULL;
+
+    memset(mcfg, 0, sizeof(*mcfg));
+    mcfg->header.signature    = ACPI_MCFG_SIGNATURE;
+    mcfg->header.revision     = ACPI_1_0_MCFG_REVISION;
+    fixed_strcpy(mcfg->header.oem_id, ACPI_OEM_ID);
+    fixed_strcpy(mcfg->header.oem_table_id, ACPI_OEM_TABLE_ID);
+    mcfg->header.oem_revision = ACPI_OEM_REVISION;
+    mcfg->header.creator_id   = ACPI_CREATOR_ID;
+    mcfg->header.creator_revision = ACPI_CREATOR_REVISION;
+    mcfg->header.length = sizeof(*mcfg);
+
+    mcfg->entries[0].base_address = config->mmconfig_addr;
+    mcfg->entries[0].pci_segment = 0;
+    mcfg->entries[0].start_pci_bus_num = 0;
+    mcfg->entries[0].end_pci_bus_num =
+        MCFG_SIZE_TO_NUM_BUSES(config->mmconfig_len) - 1;
+
+    set_checksum(mcfg, offsetof(struct acpi_header, checksum), sizeof(*mcfg));
+
+    return mcfg;;
+}
+
 static int construct_passthrough_tables(struct acpi_ctxt *ctxt,
                                         unsigned long *table_ptrs,
                                         int nr_tables,
@@ -350,6 +381,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
     struct acpi_20_hpet *hpet;
     struct acpi_20_waet *waet;
     struct acpi_20_tcpa *tcpa;
+    struct acpi_mcfg *mcfg;
     unsigned char *ssdt;
     void *lasa;
 
@@ -408,6 +440,16 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_laptop_slate, sizeof(ssdt_laptop_slate));
         table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
+    }
+
+    /* MCFG */
+    if ( config->table_flags & ACPI_HAS_MCFG )
+    {
+        mcfg = construct_mcfg(ctxt, config);
+        if (!mcfg)
+            return -1;
+
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, mcfg);
     }
 
     /* TPM TCPA and SSDT. */

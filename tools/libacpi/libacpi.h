@@ -36,6 +36,7 @@
 #define ACPI_HAS_8042              (1<<13)
 #define ACPI_HAS_CMOS_RTC          (1<<14)
 #define ACPI_HAS_SSDT_LAPTOP_SLATE (1<<15)
+#define ACPI_HAS_MCFG              (1<<16)
 
 struct xen_vmemrange;
 struct acpi_numa {
@@ -96,6 +97,9 @@ struct acpi_config {
     uint32_t ioapic_base_address;
     uint16_t pci_isa_irq_mask;
     uint8_t ioapic_id;
+
+    uint64_t mmconfig_addr;
+    uint32_t mmconfig_len;
 };
 
 int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);
