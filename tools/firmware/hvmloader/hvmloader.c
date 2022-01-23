@@ -350,7 +350,8 @@ int main(void)
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
 
     apic_setup();
-    pci_setup();
+    if ( get_pc_machine_type() != MACHINE_TYPE_Q35 )
+        pci_setup();
 
     smp_initialise();
 

@@ -217,23 +217,23 @@ QEMU_TRADITIONAL_REVISION ?= $(QEMU_TAG)
 endif
 
 ifeq ($(GIT_HTTP),y)
-OVMF_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/ovmf.git
-QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-xen.git
+OVMF_UPSTREAM_URL ?= https://github.com/spiriou/edk2.git
+QEMU_UPSTREAM_URL ?= https://github.com/spiriou/qemu.git
 QEMU_TRADITIONAL_URL ?= http://xenbits.xen.org/git-http/qemu-xen-traditional.git
-SEABIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/seabios.git
+SEABIOS_UPSTREAM_URL ?= https://github.com/spiriou/seabios.git
 MINIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/mini-os.git
 else
-OVMF_UPSTREAM_URL ?= git://xenbits.xen.org/ovmf.git
-QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-xen.git
+OVMF_UPSTREAM_URL ?= git://github.com:spiriou/edk2.git
+QEMU_UPSTREAM_URL ?= git://github.com:spiriou/qemu.git
 QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-traditional.git
-SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
+SEABIOS_UPSTREAM_URL ?= git://github.com:spiriou/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
-OVMF_UPSTREAM_REVISION ?= 7b4a99be8a39c12d3a7fc4b8db9f0eab4ac688d5
+OVMF_UPSTREAM_REVISION ?= master
 QEMU_UPSTREAM_REVISION ?= master
 MINIOS_UPSTREAM_REVISION ?= 83ff43bff4bdd6879539fcb2b3d6ba5e61a64135
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.15.0
+SEABIOS_UPSTREAM_REVISION ?= master
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 

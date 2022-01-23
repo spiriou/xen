@@ -262,58 +262,6 @@ void pci_setup(void)
         ASSERT((devfn != PCI_ISA_DEVFN) ||
                ((vendor_id == 0x8086) && (device_id == 0x7000)));
 
-        switch ( class )
-        {
-        case 0x0300:
-            /* If emulated VGA is found, preserve it as primary VGA. */
-            if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
-            {
-                vga_devfn = devfn;
-                virtual_vga = VGA_std;
-            }
-            else if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
-            {
-                vga_devfn = devfn;
-                virtual_vga = VGA_cirrus;
-            }
-            else if ( virtual_vga == VGA_none )
-            {
-                vga_devfn = devfn;
-                virtual_vga = VGA_pt;
-                if ( vendor_id == 0x8086 )
-                {
-                    igd_opregion_pgbase = mem_hole_alloc(IGD_OPREGION_PAGES);
-                    /*
-                     * Write the the OpRegion offset to give the opregion
-                     * address to the device model. The device model will trap 
-                     * and map the OpRegion at the give address.
-                     */
-                    pci_writel(vga_devfn, PCI_INTEL_OPREGION,
-                               igd_opregion_pgbase << PAGE_SHIFT);
-                }
-            }
-            break;
-        case 0x0680:
-            /* PIIX4 ACPI PM. Special device with special PCI config space. */
-            ASSERT((vendor_id == 0x8086) && (device_id == 0x7113));
-            pci_writew(devfn, 0x20, 0x0000); /* No smb bus IO enable */
-            pci_writew(devfn, 0xd2, 0x0000); /* No smb bus IO enable */
-            pci_writew(devfn, 0x22, 0x0000);
-            pci_writew(devfn, 0x3c, 0x0009); /* Hardcoded IRQ9 */
-            pci_writew(devfn, 0x3d, 0x0001);
-            pci_writel(devfn, 0x40, ACPI_PM1A_EVT_BLK_ADDRESS_V1 | 1);
-            pci_writeb(devfn, 0x80, 0x01); /* enable PM io space */
-            break;
-        case 0x0101:
-            if ( vendor_id == 0x8086 )
-            {
-                /* Intel ICHs since PIIX3: enable IDE legacy mode. */
-                pci_writew(devfn, 0x40, 0x8000); /* enable IDE0 */
-                pci_writew(devfn, 0x42, 0x8000); /* enable IDE1 */
-            }
-            break;
-        }
-
         class_specific_pci_device_setup(vendor_id, device_id,
                                         0 /* virt_bus support TBD */, devfn);
 

@@ -443,6 +443,8 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         }
     } else if (MATCH_OPTION("bridge", token, oparg)) {
         replace_string(&nic->bridge, oparg);
+    } else if (MATCH_OPTION("bus", token, oparg)) {
+        replace_string(&nic->bus, oparg);
     } else if (MATCH_OPTION("netdev", token, oparg)) {
         fprintf(stderr, "the netdev parameter is deprecated, "
                         "please use gatewaydev instead\n");

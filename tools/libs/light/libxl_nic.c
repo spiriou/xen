@@ -85,6 +85,10 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         nic->bridge = strdup("xenbr0");
         if (!nic->bridge) return ERROR_NOMEM;
     }
+    if (!nic->bus) {
+        nic->bus = strdup("");
+        if (!nic->bus) return ERROR_NOMEM;
+    }
     if ( !nic->script && asprintf(&nic->script, "%s/vif-bridge",
                                   libxl__xen_script_dir_path()) < 0 )
         return ERROR_FAIL;

@@ -788,6 +788,7 @@ int get_pc_machine_type(void)
 #define PCIEXBAR_LENGTH_BITS(reg)   (((reg) >> 1) & 3)
 #define PCIEXBAREN                  1
 
+#if 0
 static uint64_t mmconfig_get_base(void)
 {
     uint64_t base;
@@ -844,6 +845,7 @@ static int is_mmconfig_used(void)
 
     return 0;
 }
+#endif
 
 static void validate_hvm_info(struct hvm_info_table *t)
 {
@@ -1083,11 +1085,11 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         config->pci_hi_len = pci_hi_mem_end - pci_hi_mem_start;
     }
 
-    if ( is_mmconfig_used() )
+    if ( get_pc_machine_type() == MACHINE_TYPE_Q35 )
     {
         config->table_flags |= ACPI_HAS_MCFG;
-        config->mmconfig_addr = mmconfig_get_base();
-        config->mmconfig_len  = mmconfig_get_size();
+        config->mmconfig_addr = 0xb0000000;
+        config->mmconfig_len  = MB(256);
     }
 
     s = xenstore_read("platform/generation-id", "0:0");

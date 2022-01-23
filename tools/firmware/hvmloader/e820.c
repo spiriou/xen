@@ -201,6 +201,14 @@ int build_e820_table(struct e820entry *e820,
     e820[nr].type = E820_RESERVED;
     nr++;
 
+    if ( get_pc_machine_type() == MACHINE_TYPE_Q35 )
+    {
+        e820[nr].addr = 0xb0000000;
+        e820[nr].size = 0x10000000;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+    }
+
     /*
      * Mark populated reserved memory that contains ACPI tables as ACPI NVS.
      * That should help the guest to treat it correctly later: e.g. pass to

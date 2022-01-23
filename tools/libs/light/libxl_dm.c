@@ -1215,6 +1215,20 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                       GCSPRINTF("%d", guest_domid), NULL);
     flexarray_append(dm_args, "-no-shutdown");
 
+    switch (b_info->type) {
+    case LIBXL_DOMAIN_TYPE_PVH:
+    case LIBXL_DOMAIN_TYPE_PV:
+        for (i = 0; b_info->extra_pv && b_info->extra_pv[i] != NULL; i++)
+            flexarray_append(dm_args, b_info->extra_pv[i]);
+        break;
+    case LIBXL_DOMAIN_TYPE_HVM:
+        for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
+            flexarray_append(dm_args, b_info->extra_hvm[i]);
+        break;
+    default:
+        abort();
+    }
+
     /*
      * QMP access to qemu running in stubdomain is done over vchan. The
      * stubdomain init script adds the appropriate monitor options for
@@ -1555,11 +1569,15 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 const char *ifname = libxl__device_nic_devname(gc,
                                                 guest_domid, nics[i].devid,
                                                 LIBXL_NIC_TYPE_VIF_IOEMU);
+                const char *bus_config = "";
+		if (strlen(nics[i].bus) > 0)
+			bus_config = GCSPRINTF(",bus=%s", nics[i].bus);
+
                 flexarray_append(dm_args, "-device");
                 flexarray_append(dm_args,
-                   GCSPRINTF("%s,id=nic%d,netdev=net%d,mac=%s",
+                   GCSPRINTF("%s,id=nic%d,netdev=net%d,mac=%s%s",
                              nics[i].model, nics[i].devid,
-                             nics[i].devid, smac));
+                             nics[i].devid, smac, bus_config));
                 flexarray_append(dm_args, "-netdev");
                 flexarray_append(dm_args,
                                  GCSPRINTF("type=tap,id=net%d,ifname=%s,"
@@ -1788,8 +1806,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_PVH:
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
-        for (i = 0; b_info->extra_pv && b_info->extra_pv[i] != NULL; i++)
-            flexarray_append(dm_args, b_info->extra_pv[i]);
         break;
     case LIBXL_DOMAIN_TYPE_HVM:
 
@@ -1831,8 +1847,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 machinearg = GCSPRINTF("%s,igd-passthru=on", machinearg);
                 break;
             case LIBXL_GFX_PASSTHRU_KIND_DEFAULT:
-                LOGD(ERROR, guest_domid, "unable to detect required gfx_passthru_kind");
-                return ERROR_FAIL;
+                LOGD(WARN, guest_domid, "unable to detect required gfx_passthru_kind");
+                machinearg = GCSPRINTF("%s,igd-passthru=on", machinearg);
+                break;
+                // return ERROR_FAIL;
             default:
                 LOGD(ERROR, guest_domid, "invalid value for gfx_passthru_kind");
                 return ERROR_INVAL;
@@ -1840,8 +1858,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         flexarray_append(dm_args, machinearg);
-        for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
-            flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;
     default:
         abort();

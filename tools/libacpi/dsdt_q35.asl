@@ -93,7 +93,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                     * Also, ACPI hotplug is used for now instead of PCIe
                     * Native Hot Plug
                     */
-                   And(CTRL, 0x0C, CTRL)
+                   And(CTRL, 0x1C, CTRL)
 
                    If (LNotEqual(CDW3, CTRL)) {
                        /* Some of Capabilities bits were masked */
@@ -112,7 +112,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            /* Make cirrues VGA S3 suspend/resume work in Windows XP/2003 */
            Device (VGA)
            {
-               Name (_ADR, 0x00020000)
+               Name (_ADR, 0x00010000)
 
                Method (_S1D, 0, NotSerialized)
                {
@@ -172,10 +172,10 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         ResourceProducer, PosDecode, MinFixed, MaxFixed,
                         NonCacheable, ReadWrite,
                         0x00000000,
-                        0xF0000000,
+                        0xC0000000,
                         0xF4FFFFFF,
                         0x00000000,
-                        0x05000000,
+                        0x35000000,
                         ,, _Y01)
 
                     QWordMemory (
@@ -535,6 +535,36 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                     }
                 }
             }
+
+            Device (FWCF)
+            {
+                Name (_HID, "QEMU0002")  // _HID: Hardware ID
+                Name (_STA, 0x0B)  // _STA: Status
+                Name (_CRS, ResourceTemplate ()  // _CRS: Current Resource Settings
+                {
+                    IO (Decode16,
+                        0x0510,             // Range Minimum
+                        0x0510,             // Range Maximum
+                        0x01,               // Alignment
+                        0x0C,               // Length
+                        )
+                })
+            }
+        }
+
+        Device (DRAC)
+        {
+            Name (_HID, "PNP0C01" /* System Board */)  // _HID: Hardware ID
+            Name (_CRS, ResourceTemplate ()  // _CRS: Current Resource Settings
+            {
+                DWordMemory (ResourceProducer, PosDecode, MinFixed, MaxFixed, NonCacheable, ReadWrite,
+                    0x00000000,         // Granularity
+                    0xB0000000,         // Range Minimum
+                    0xBFFFFFFF,         // Range Maximum
+                    0x00000000,         // Translation Offset
+                    0x10000000,         // Length
+                    ,, , AddressRangeMemory, TypeStatic)
+            })
         }
     }
     /* _S3 and _S4 are in separate SSDTs */

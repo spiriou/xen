@@ -174,6 +174,7 @@ int main(int argc, char **argv)
     /* (we append to existing DSDT definition block) */
     indent_level++;
 
+#if 0
     /**** Processor start ****/
     push_block("Scope", "\\_SB");
 
@@ -242,12 +243,15 @@ int main(int argc, char **argv)
 
         pop_block();
     }
-
+#endif // if 0
 #ifdef CONFIG_ARM_64
+#if 0
     pop_block();
+#endif
     /**** Processor end ****/
 #else
 
+#if 0
     /* Operation Region 'PRST': bitmask of online CPUs. */
     stmt("OperationRegion", "PRST, SystemIO, %#x, %d",
         XEN_ACPI_CPU_MAP, XEN_ACPI_CPU_MAP_LEN);
@@ -282,9 +286,9 @@ int main(int argc, char **argv)
         pop_block();
     }
     stmt("Return", "One");
-    pop_block();
+    pop_block(); // Method
 
-    pop_block();
+    pop_block(); // SB
 
     /* Define GPE control method. */
     push_block("Scope", "\\_GPE");
@@ -294,13 +298,13 @@ int main(int argc, char **argv)
     stmt("\\_SB.PRSC ()", NULL);
     pop_block();
     pop_block();
+#endif // CPU ISSUE END
 
     if (dm_version == QEMU_NONE) {
         pop_block();
         return 0;
     }
     /**** Processor end ****/
-
 
     /**** PCI0 start ****/
     push_block("Scope", "\\_SB.PCI0");
@@ -333,7 +337,17 @@ int main(int argc, char **argv)
     stmt("Name", "BUFB, Buffer() { "
          "0x23, 0x00, 0x00, 0x18, " /* IRQ descriptor */
          "0x79, 0 }");              /* End tag, null checksum */
-    stmt("CreateWordField", "BUFB, 0x01, IRQV");
+
+    // push_block("Method", "IQCR, 1, Serialized");
+    // /* BUFB: IRQ descriptor for returning from link-device _CRS methods. */
+    // stmt("Name", "BUFB, Buffer() { "
+    //      "0x23, 0x00, 0x00, 0x18, " /* IRQ descriptor */
+    //      "0x79, 0 }");              /* End tag, null checksum */
+    // stmt("CreateDWordField", "PRR0, \_SB.IQCR._Y00._INT, PRRI");  // _INT: Interrupts
+    // stmt("PRRI = (Arg0 & 0x0F)");
+    // stmt("Return (PRR0)"); /* \_SB_.IQCR.PRR0 */
+    // pop_block();
+
     /* Create four PCI-ISA link devices: LNKA, LNKB, LNKC, LNKD. */
     for ( link = 0; link < 4; link++ )
     {
@@ -355,6 +369,7 @@ int main(int argc, char **argv)
         stmt("Or", "PIR%c, 0x80, PIR%c", 'A'+link, 'A'+link);
         pop_block();
         push_block("Method", "_CRS");
+        stmt("CreateWordField", "BUFB, 0x01, IRQV");
         stmt("And", "PIR%c, 0x0f, Local0", 'A'+link);
         stmt("ShiftLeft", "0x1, Local0, IRQV");
         stmt("Return", "BUFB");
